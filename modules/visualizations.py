@@ -378,8 +378,176 @@ def viz_three(data: dict) -> None:
     st.plotly_chart(fig, width="stretch")
 
 
+_ENV_IMPACT_TEMPLATE = """
+<div class="env-banner">
+  <style>
+    .env-banner {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #f4f9f4 0%, #eef6ee 100%);
+      border-radius: 16px;
+      padding: 22px 28px 18px;
+      box-sizing: border-box;
+      width: 100%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .env-title {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 700;
+      color: #263238;
+      margin: 0 0 14px;
+    }
+    .env-row {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 190px;
+    }
+    .env-flow-svg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .env-col { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
+    .env-col.left { flex: 0 0 22%; }
+    .env-col.center { flex: 0 0 34%; }
+    .env-col.right { flex: 0 0 34%; }
+
+    /* --- solar panel icon --- */
+    .sun { font-size: 30px; line-height: 1; margin-bottom: -6px; filter: drop-shadow(0 0 6px rgba(255,193,7,0.5)); }
+    .panel {
+      width: 92px; height: 58px;
+      background: repeating-linear-gradient(90deg, #2a5d8a 0 20px, #1e4666 20px 22px),
+                  repeating-linear-gradient(0deg, #2a5d8a 0 12px, #1e4666 12px 14px);
+      border: 3px solid #17324a;
+      border-radius: 4px;
+      transform: perspective(200px) rotateX(18deg);
+      box-shadow: 0 6px 10px rgba(0,0,0,0.12);
+    }
+    .panel-stand { width: 6px; height: 22px; background: #78909c; margin: 0 auto; }
+    .tree-cluster { display: flex; align-items: flex-end; margin-top: 4px; }
+    .tree-cluster span { line-height: 1; }
+    .cluster-left span:nth-child(1) { font-size: 22px; margin-right: -6px; opacity: 0.85; }
+    .cluster-left span:nth-child(2) { font-size: 30px; margin-right: -6px; }
+    .cluster-left span:nth-child(3) { font-size: 20px; opacity: 0.85; }
+
+    /* --- stats --- */
+    .stat-block { text-align: center; margin-bottom: 14px; }
+    .stat-label {
+      font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+      color: #37474F; text-transform: uppercase; margin-bottom: 2px;
+    }
+    .stat-value { font-size: 40px; font-weight: 800; line-height: 1.1; }
+    .stat-value.trees { color: #2e7d32; }
+    .stat-value.co2 { color: #4a7fa8; font-size: 30px; }
+
+    /* --- forest cluster (right) --- */
+    .forest-wrap { position: relative; display: flex; align-items: flex-end; }
+    .forest-wrap span.tree { line-height: 1; }
+    .forest-wrap span.tree:nth-child(1) { font-size: 26px; margin-right: -8px; opacity: 0.8; }
+    .forest-wrap span.tree:nth-child(2) { font-size: 40px; margin-right: -10px; }
+    .forest-wrap span.tree:nth-child(3) { font-size: 30px; margin-right: -8px; opacity: 0.9; }
+    .forest-wrap span.tree:nth-child(4) { font-size: 44px; margin-right: -8px; }
+    .forest-wrap span.tree:nth-child(5) { font-size: 24px; opacity: 0.8; }
+    .wildlife { position: absolute; top: -6px; right: 6px; font-size: 15px; opacity: 0.85; }
+    .wildlife.deer { top: 6px; right: -8px; font-size: 18px; }
+    .co2-clouds { display: flex; gap: 10px; margin-bottom: 2px; }
+    .co2-cloud {
+      display: flex; align-items: center; gap: 3px;
+      font-size: 11px; font-weight: 700; color: #6b7c93;
+      background: rgba(255,255,255,0.7); border-radius: 10px; padding: 2px 7px;
+      animation: env-float 3.2s ease-in-out infinite;
+    }
+    .co2-cloud:nth-child(2) { animation-delay: 0.6s; }
+    .co2-cloud .arrow { color: #7ea0c2; }
+    @keyframes env-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    /* --- sprout row --- */
+    .sprout-row {
+      display: flex; justify-content: space-between; padding: 6px 4% 0;
+      font-size: 18px; opacity: 0.9;
+    }
+
+    /* --- flow text pill --- */
+    .flow-pill {
+      background: white; border-radius: 999px; padding: 9px 20px;
+      margin: 12px auto 6px; max-width: 92%; text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      font-size: 13.5px; font-weight: 600; color: #2b2f33;
+    }
+    .env-footnote { text-align: center; font-size: 11px; color: #90A4AE; margin-top: 2px; }
+  </style>
+
+  <div class="env-title">Environmental Impact of Solar Generation</div>
+
+  <div class="env-row">
+    <svg class="env-flow-svg" viewBox="0 0 800 190" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#66bb6a" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="#66bb6a" stop-opacity="0.05"/>
+        </linearGradient>
+      </defs>
+      <path d="M110,140 C260,60 300,150 400,110 C500,70 560,140 690,60"
+            fill="none" stroke="url(#flowGrad)" stroke-width="10" stroke-linecap="round"/>
+    </svg>
+
+    <div class="env-col left">
+      <div class="sun">☀️</div>
+      <div class="panel"></div>
+      <div class="panel-stand"></div>
+      <div class="tree-cluster cluster-left">
+        <span>🌲</span><span>🌳</span><span>🌲</span>
+      </div>
+    </div>
+
+    <div class="env-col center">
+      <div class="stat-block">
+        <div class="stat-label">🌱 Tree Equivalent</div>
+        <div class="stat-value trees">__TREE_EQ__</div>
+      </div>
+      <div class="stat-block" style="margin-bottom:0;">
+        <div class="stat-label">CO₂ Emissions Avoided</div>
+        <div class="stat-value co2">__CO2__ tCO₂e</div>
+      </div>
+    </div>
+
+    <div class="env-col right">
+      <div class="co2-clouds">
+        <div class="co2-cloud">☁️ CO₂ <span class="arrow">↑</span></div>
+        <div class="co2-cloud">☁️ CO₂ <span class="arrow">↑</span></div>
+      </div>
+      <div class="forest-wrap">
+        <span class="wildlife">🦉</span>
+        <span class="wildlife deer">🦌</span>
+        <span class="tree">🌲</span><span class="tree">🌳</span><span class="tree">🌲</span><span class="tree">🌳</span><span class="tree">🌲</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sprout-row">🌱🌱🌱🌱🌱🌱🌱🌱🌱🌱🌱🌱</div>
+
+  <div class="flow-pill">__UNITS__ solar units generated&nbsp;&nbsp;→&nbsp;&nbsp;__CO2__ tCO₂e avoided&nbsp;&nbsp;→&nbsp;&nbsp;__TREE_EQ__ tree seedlings equivalent</div>
+  <div class="env-footnote">Based on CEA v21.0 India grid factor of 0.7117 kg CO₂/kWh &middot; Tree equivalency based on EPA methodology</div>
+</div>
+"""
+
+
 def viz_four(data: dict) -> None:
-    """Visualization 4 — Environmental Impact of solar generation."""
+    """Visualization 4 — Environmental Impact of solar generation.
+
+    A flat-illustration banner (solar panel, tree clusters, CO2 cloud
+    icons, a connecting flow ribbon, and a sprout row) built from HTML/CSS/
+    SVG and rendered via st.iframe, since this is a decorative infographic
+    layout rather than a data-scaled chart.
+    """
     st.subheader("Environmental Impact")
 
     total_solar_units = data["total_solar_units"]
@@ -390,59 +558,10 @@ def viz_four(data: dict) -> None:
     co2_avoided_tonnes = round(total_solar_units * grid_emission_factor / 1000, 1)
     tree_equivalent = round(co2_avoided_tonnes / co2_per_tree)
 
-    fig = go.Figure()
-
-    fig.add_trace(
-        go.Indicator(
-            mode="number",
-            value=tree_equivalent,
-            number=dict(valueformat=",d", font=dict(size=64, color="#557A62")),
-            title=dict(text="<b>🌱 Tree Equivalent</b>", font=dict(size=19, color="#37474F")),
-            domain=dict(x=[0, 1], y=[0.50, 1]),
-        )
+    html = (
+        _ENV_IMPACT_TEMPLATE.replace("__TREE_EQ__", f"{tree_equivalent:,}")
+        .replace("__CO2__", f"{co2_avoided_tonnes:,.1f}")
+        .replace("__UNITS__", f"{total_solar_units:,.0f}")
     )
 
-    fig.add_trace(
-        go.Indicator(
-            mode="number",
-            value=co2_avoided_tonnes,
-            number=dict(valueformat=",.1f", suffix=" tCO₂e", font=dict(size=34, color="#6689A8")),
-            title=dict(text="<b>CO₂ Emissions Avoided</b>", font=dict(size=15, color="#607D8B")),
-            domain=dict(x=[0, 1], y=[0.18, 0.48]),
-        )
-    )
-
-    fig.add_annotation(
-        x=0.5,
-        y=0.06,
-        xref="paper",
-        yref="paper",
-        text=(
-            f"<b>{total_solar_units:,.0f} solar units generated</b> → "
-            f"<b>{co2_avoided_tonnes:,.1f} tCO₂e avoided</b> → "
-            f"<b>{tree_equivalent:,.0f} tree seedlings equivalent</b>"
-        ),
-        showarrow=False,
-        font=dict(size=13, color="#455A64"),
-        align="center",
-    )
-
-    fig.update_layout(
-        height=480,
-        template="plotly_white",
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        margin=dict(l=40, r=40, t=90, b=70),
-        title=dict(
-            text="<b>Environmental Impact of Solar Generation</b>",
-            x=0.5,
-            xanchor="center",
-            font=dict(size=21, color="#263238"),
-        ),
-    )
-
-    st.plotly_chart(fig, width="stretch")
-    st.caption(
-        "Based on CEA v21.0 India grid factor of 0.7117 kg CO₂/kWh · "
-        "Tree equivalency based on EPA methodology"
-    )
+    st.iframe(html, height="content")
