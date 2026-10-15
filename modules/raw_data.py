@@ -35,7 +35,7 @@ df4 = pd.DataFrame({
     "With GST Cost": [5615940, 2728084, 269759],
     "Installed Solar (kW)": [150.0, 70.0, 71.0],
     "Rate per Unit": [21.8, 7.0, 8.5],
-    "Total Unit": [142044.0, 48543.0, 5531.0],
+    "Total Unit": [142044.0, 48543.0, 5531.0],  # recomputed below from the monthly columns
     "Total Recovery": [2859963.0, 339801.0, 47013.5],  # recomputed below for Bhiwandi/Raliawas
 
     # --------------------------------------------------------
@@ -133,6 +133,21 @@ df4 = pd.DataFrame({
     "June -26 Amount Saved": [342078.0, 64610.0, 45631.0],
     "June -26 Performance %": [87.0, 1.2, 0.8],
     "June -26 Unit per KW": [3.4, 4.3, 3.0],
+
+    "Jul 26 Solar Units": [8489.0, 7380.0, 3773.0],
+    "Jul 26 Amount Saved": [184890.42, 51660.0, 31127.25],
+    "Jul 26 Performance %": [46.0, 0.9, 0.4],
+    "Jul 26 Unit per KW": [1.8, 3.4, 1.7],
+
+    "Aug 26 Solar Units": [12422.0, 7058.0, 4735.0],
+    "Aug 26 Amount Saved": [270551.16, 49406.0, 39063.75],
+    "Aug 26 Performance %": [67.0, 0.8, 0.5],
+    "Aug 26 Unit per KW": [2.7, 3.3, 2.2],
+
+    "Sep 26 Solar Units": [12931.0, 6742.0, 5305.0],
+    "Sep 26 Amount Saved": [281637.18, 47194.0, 43766.25],
+    "Sep 26 Performance %": [70.0, 0.8, 0.6],
+    "Sep 26 Unit per KW": [2.8, 3.1, 2.4],
 })
 
 # Normalize location names for consistency
@@ -144,7 +159,7 @@ df4["Location"] = df4["Location"].replace({
 # ------------------------------------------------------------------
 # Keep "Total Recovery" in sync with the monthly columns.
 #
-# Bhiwandi and Raliawas have a complete Mar-25..Jun-26 monthly history, so
+# Bhiwandi and Raliawas have a complete Mar-25..Sep-26 monthly history, so
 # their Total Recovery is recomputed as the sum of those columns — this is
 # what pulls the April-2026 correction above through into every total.
 # Surat only has monthly tracking from June 2026 onward; its Total Recovery
@@ -156,6 +171,17 @@ df4["Location"] = df4["Location"].replace({
 _amount_saved_cols = [c for c in df4.columns if "Amount Saved" in c]
 _monthly_sum = df4[_amount_saved_cols].sum(axis=1, skipna=True)
 df4.loc[df4["Location"] != "Surat", "Total Recovery"] = _monthly_sum[df4["Location"] != "Surat"]
+
+# Surat: keep the pre-June-2026 recovery (reported total minus the June
+# column) and add every tracked month on top, so new months flow through.
+_surat = df4["Location"] == "Surat"
+_SURAT_PRE_TRACKING_RECOVERY = 47013.5 - 45631.0
+df4.loc[_surat, "Total Recovery"] = _SURAT_PRE_TRACKING_RECOVERY + _monthly_sum[_surat]
+
+# Total Unit is likewise derived from the monthly generation columns, so
+# adding a new month updates the KPI cards and the CO2 tab automatically.
+_unit_cols = [c for c in df4.columns if "Solar Unit" in c]
+df4["Total Unit"] = df4[_unit_cols].sum(axis=1, skipna=True)
 
 # ============================================================
 # DF2 — PLANT-LEVEL INVESTMENT / RECOVERY (derived from df4)
@@ -224,6 +250,9 @@ def _build_monthly(source: pd.DataFrame) -> pd.DataFrame:
         ("Apr 26", "Apr 26 Solar Unit", "Apr 26 Amount Saved", "Apr 26 Performance %", "Apr 26 Unit per KW"),
         ("May 26", "May 26 Solar Units", "May 26 Amount Saved", "May 26 Performance %", "May 26 Unit per KW"),
         ("Jun 26", "June -26 Solar Units", "June -26 Amount Saved", "June -26 Performance %", "June -26 Unit per KW"),
+        ("Jul 26", "Jul 26 Solar Units", "Jul 26 Amount Saved", "Jul 26 Performance %", "Jul 26 Unit per KW"),
+        ("Aug 26", "Aug 26 Solar Units", "Aug 26 Amount Saved", "Aug 26 Performance %", "Aug 26 Unit per KW"),
+        ("Sep 26", "Sep 26 Solar Units", "Sep 26 Amount Saved", "Sep 26 Performance %", "Sep 26 Unit per KW"),
     ]
 
     records = []

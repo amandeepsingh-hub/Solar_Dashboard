@@ -37,7 +37,7 @@ streamlit run app.py
 - **Tab 1 — Investment Recovery** — stacked horizontal bar of recovered vs.
   remaining investment per plant.
 - **Tab 2 — Monthly Value Creation** — monthly savings (bars) and solar
-  generation (line) across the portfolio, Mar 2025–Jun 2026.
+  generation (line) across the portfolio, Mar 2025–Sep 2026.
 - **Tab 3 — Recovery Progress** — a gauge showing overall recovery % against
   total investment (portfolio-wide, not filterable).
 - **Tab 4 — Environmental Impact** — CO₂ avoided and tree-equivalent, derived
