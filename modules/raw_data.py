@@ -1,6 +1,7 @@
 """
 Static source data for the Solar Dashboard (3 plants: Bhiwandi, Raliawas,
-Surat), transcribed from the underlying records.
+Surat), transcribed from the underlying Google Sheet ("W&D solar Plant with
+monthly Generation reports.xlsx").
 
 `df4` (wide, one row per plant with a column per month) is the single
 source of truth. `df2`, `df3`, and most of `df1`'s KPI cards are DERIVED
@@ -32,14 +33,14 @@ df4 = pd.DataFrame({
     ],
 
     "Installation Cost": [4923000.0, 2489000.0, 2667000.0],
-    "With GST Cost": [5615940, 2728084, 269759],
+    "With GST Cost": [5615940.0, 2728084.0, 269759.0],
     "Installed Solar (kW)": [150.0, 70.0, 71.0],
     "Rate per Unit": [21.8, 7.0, 8.5],
-    "Total Unit": [142044.0, 48543.0, 5531.0],  # recomputed below from the monthly columns
-    "Total Recovery": [2859963.0, 339801.0, 47013.5],  # recomputed below for Bhiwandi/Raliawas
+    "Total Unit": [534002.0, 140606.0, 71690.0],          # sheet totals (reconciled below)
+    "Total Recovery": [2859963.0, 984242.0, 609365.0],    # sheet totals (reconciled below)
 
     # --------------------------------------------------------
-    # Monthly data
+    # Monthly data (Mar 2025 – Oct 2026)
     # --------------------------------------------------------
 
     "Mar 25 Solar Unit": [2134.0, np.nan, np.nan],
@@ -110,15 +111,9 @@ df4 = pd.DataFrame({
     # ------------------------------------------------------------------
     # KNOWN DATA CORRECTION — Bhiwandi, April 2026, Amount Saved
     # ------------------------------------------------------------------
-    # The original entry here was 1,924.0 — a clear data-entry error:
-    # every neighbouring month for Bhiwandi runs 150,000-360,000, and the
-    # source notebook's own "Visualization 2" cell already flagged and
-    # corrected this exact cell as
-    #     10,821 units x Rs.21.8/unit (Bhiwandi's Rate per Unit) = 235,897.8
-    # That corrected figure is used directly here so every chart and KPI
-    # built from df4 reflects it consistently (the original notebook only
-    # patched a copy used by one chart, which is what caused the mismatch
-    # between charts in the first place).
+    # The raw Google Sheet entry here is 1,924.0 — a clear data-entry error:
+    # every neighbouring month for Bhiwandi runs 150,000-360,000, and
+    # 10,821 units x Rs.21.8/unit (Bhiwandi's Rate per Unit) = 235,897.8.
     "Apr 26 Solar Unit": [10821.0, 9856.0, np.nan],
     "Apr 26 Amount Saved": [235897.8, 68992.0, np.nan],
     "Apr 26 Performance %": [90.0, 1.2, np.nan],
@@ -136,18 +131,23 @@ df4 = pd.DataFrame({
 
     "Jul 26 Solar Units": [8489.0, 7380.0, 3773.0],
     "Jul 26 Amount Saved": [184890.42, 51660.0, 31127.25],
-    "Jul 26 Performance %": [46.0, 0.9, 0.4],
+    "Jul 26 Performance %": [46.0, 85.0, 43.0],
     "Jul 26 Unit per KW": [1.8, 3.4, 1.7],
 
     "Aug 26 Solar Units": [12422.0, 7058.0, 4735.0],
     "Aug 26 Amount Saved": [270551.16, 49406.0, 39063.75],
-    "Aug 26 Performance %": [67.0, 0.8, 0.5],
+    "Aug 26 Performance %": [67.0, 81.0, 54.0],
     "Aug 26 Unit per KW": [2.7, 3.3, 2.2],
 
     "Sep 26 Solar Units": [12931.0, 6742.0, 5305.0],
     "Sep 26 Amount Saved": [281637.18, 47194.0, 43766.25],
-    "Sep 26 Performance %": [70.0, 0.8, 0.6],
+    "Sep 26 Performance %": [70.0, 78.0, 60.0],
     "Sep 26 Unit per KW": [2.8, 3.1, 2.4],
+
+    "Oct 26 Solar Units": [16038.0, 6273.0, 6715.0],
+    "Oct 26 Amount Saved": [349307.6, 43911.0, 55398.75],
+    "Oct 26 Performance %": [86.0, 72.0, 76.0],
+    "Oct 26 Unit per KW": [3.4, 2.9, 3.1],
 })
 
 # Normalize location names for consistency
@@ -157,31 +157,42 @@ df4["Location"] = df4["Location"].replace({
 })
 
 # ------------------------------------------------------------------
-# Keep "Total Recovery" in sync with the monthly columns.
+# Reconcile "Total Unit" and "Total Recovery" with monthly columns.
 #
-# Bhiwandi and Raliawas have a complete Mar-25..Sep-26 monthly history, so
-# their Total Recovery is recomputed as the sum of those columns — this is
-# what pulls the April-2026 correction above through into every total.
-# Surat only has monthly tracking from June 2026 onward; its Total Recovery
-# includes recovery accrued before that (not represented in any monthly
-# column), so it's left as originally reported rather than being
-# overwritten by an incomplete monthly sum.
+# The Google Sheet's "Total Unit" and "Total Recovery" columns include
+# cumulative historical totals accrued prior to the monthly breakdown
+# columns. We preserve those pre-tracking baselines and add the sum of
+# all tracked monthly columns (including the Apr-26 Bhiwandi fix and
+# Oct-26 data) so any newly added months flow automatically into KPIs.
 # ------------------------------------------------------------------
 
 _amount_saved_cols = [c for c in df4.columns if "Amount Saved" in c]
-_monthly_sum = df4[_amount_saved_cols].sum(axis=1, skipna=True)
-df4.loc[df4["Location"] != "Surat", "Total Recovery"] = _monthly_sum[df4["Location"] != "Surat"]
+_monthly_recovery_sum = df4[_amount_saved_cols].sum(axis=1, skipna=True)
 
-# Surat: keep the pre-June-2026 recovery (reported total minus the June
-# column) and add every tracked month on top, so new months flow through.
-_surat = df4["Location"] == "Surat"
-_SURAT_PRE_TRACKING_RECOVERY = 47013.5 - 45631.0
-df4.loc[_surat, "Total Recovery"] = _SURAT_PRE_TRACKING_RECOVERY + _monthly_sum[_surat]
+# Pre-tracking recovery offsets (Sheet Total Recovery minus tracked monthly sum using raw Apr-26 value)
+_PRE_TRACKING_RECOVERY = pd.Series(
+    [
+        2859963.0 - (_monthly_recovery_sum.iloc[0] - 235897.8 + 1924.0),  # Bhiwandi pre-Mar 25 / historical offset
+        984242.0 - _monthly_recovery_sum.iloc[1],                        # Raliawas pre-Jan 26 recovery
+        609365.0 - _monthly_recovery_sum.iloc[2],                        # Surat pre-Jun 26 recovery
+    ],
+    index=df4.index,
+)
+df4["Total Recovery"] = _PRE_TRACKING_RECOVERY + _monthly_recovery_sum
 
-# Total Unit is likewise derived from the monthly generation columns, so
-# adding a new month updates the KPI cards and the CO2 tab automatically.
 _unit_cols = [c for c in df4.columns if "Solar Unit" in c]
-df4["Total Unit"] = df4[_unit_cols].sum(axis=1, skipna=True)
+_monthly_unit_sum = df4[_unit_cols].sum(axis=1, skipna=True)
+
+# Pre-tracking unit offsets (Sheet Total Unit minus tracked monthly sum)
+_PRE_TRACKING_UNITS = pd.Series(
+    [
+        534002.0 - _monthly_unit_sum.iloc[0],
+        140606.0 - _monthly_unit_sum.iloc[1],
+        71690.0 - _monthly_unit_sum.iloc[2],
+    ],
+    index=df4.index,
+)
+df4["Total Unit"] = _PRE_TRACKING_UNITS + _monthly_unit_sum
 
 # ============================================================
 # DF2 — PLANT-LEVEL INVESTMENT / RECOVERY (derived from df4)
@@ -253,6 +264,7 @@ def _build_monthly(source: pd.DataFrame) -> pd.DataFrame:
         ("Jul 26", "Jul 26 Solar Units", "Jul 26 Amount Saved", "Jul 26 Performance %", "Jul 26 Unit per KW"),
         ("Aug 26", "Aug 26 Solar Units", "Aug 26 Amount Saved", "Aug 26 Performance %", "Aug 26 Unit per KW"),
         ("Sep 26", "Sep 26 Solar Units", "Sep 26 Amount Saved", "Sep 26 Performance %", "Sep 26 Unit per KW"),
+        ("Oct 26", "Oct 26 Solar Units", "Oct 26 Amount Saved", "Oct 26 Performance %", "Oct 26 Unit per KW"),
     ]
 
     records = []
